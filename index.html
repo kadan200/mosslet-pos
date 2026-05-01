@@ -1,0 +1,418 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="mosslet POS">
+  <title>mosslet POS</title>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,600;1,300;1,600&family=DM+Sans:wght@400;500&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#BFD0C8; --surface:#B0C4BB; --hi:#A2B8AE; --border:#849E94;
+      --text:#192620; --muted:#3A5048; --accent:#2A6B50; --warm:#7A5030; --danger:#A03B2E;
+      --fd:'Cormorant Garamond',Georgia,serif;
+      --fb:'DM Sans','Hiragino Sans',sans-serif;
+      --fm:'DM Mono','Courier New',monospace;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
+    html,body{height:100%;background:var(--bg);overflow:hidden;}
+    #root{height:100%;}
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;}
+    input::placeholder{color:color-mix(in srgb,var(--muted) 45%,transparent);}
+    .num{font-variant-numeric:tabular-nums;}
+    button{-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+    .scroll{overflow-y:auto;-webkit-overflow-scrolling:touch;}
+    .scroll::-webkit-scrollbar{width:4px;}
+    .scroll::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  </style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect} = React;
+
+const C = {bg:'#BFD0C8',sf:'#B0C4BB',hi:'#A2B8AE',br:'#849E94',tx:'#192620',mu:'#3A5048',ac:'#2A6B50',wm:'#7A5030',dg:'#A03B2E'};
+const F = {d:'var(--fd)',b:'var(--fb)',m:'var(--fm)'};
+
+const PRODS0 = [{id:1,name:'ポストカード 1枚',price:100},{id:2,name:'ポストカード 12枚フルセット',price:1000}];
+const QUICK  = [500,1000,2000,5000,10000];
+const TABS   = ['レジ','商品管理','売上履歴'];
+
+const LS = {
+  get:(k,fb)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):fb;}catch{return fb;}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch{}},
+};
+const yen = n => `¥${Number(n).toLocaleString('ja-JP')}`;
+
+const Lbl = ({c,style={}}) => <div style={{fontFamily:F.m,fontSize:10,letterSpacing:'0.12em',textTransform:'uppercase',color:C.mu,marginBottom:8,...style}}>{c}</div>;
+
+const Card = ({ch,el=false,da=false,st={}}) => (
+  <div style={{background:C.sf,borderRadius:6,padding:16,border:`1px ${da?'dashed':'solid'} ${C.br}`,boxShadow:el?'0 2px 12px rgba(25,38,32,0.10),0 1px 3px rgba(25,38,32,0.06)':'none',...st}}>{ch}</div>
+);
+
+const GB = ({label,onClick,col,bcol,st={}}) => (
+  <button onClick={onClick} style={{background:'transparent',border:`1px solid ${bcol||C.br}`,borderRadius:4,color:col||C.mu,padding:'9px 16px',fontSize:12,fontFamily:F.m,cursor:'pointer',letterSpacing:'0.06em',minHeight:44,...st}}>{label}</button>
+);
+
+const DelConfirm = ({label,onOk,onNo}) => (
+  <div style={{display:'flex',justifyContent:'flex-end',alignItems:'center',gap:8,paddingTop:10,borderTop:`1px solid ${C.br}`,flexWrap:'wrap'}}>
+    <span style={{fontFamily:F.m,fontSize:11,color:C.dg}}>{label}</span>
+    <button onClick={onOk} style={{background:C.dg,border:'none',borderRadius:4,color:C.bg,padding:'9px 16px',fontSize:12,fontFamily:F.m,cursor:'pointer',minHeight:44}}>削除</button>
+    <GB label="キャンセル" onClick={onNo} />
+  </div>
+);
+
+function App() {
+  const [tab,   setTab]   = useState('レジ');
+  const [prods, setProds] = useState(()=>LS.get('pos_prods',PRODS0));
+  const [sales, setSales] = useState(()=>LS.get('pos_sales',[]));
+  const [nid,   setNid]   = useState(()=>LS.get('pos_nid',10));
+  const [cart,  setCart]  = useState({});
+  const [rcvIn, setRcvIn] = useState('');
+  const [done,  setDone]  = useState(null);
+  const [ed,    setEd]    = useState(null);
+  const [nname, setNname] = useState('');
+  const [nprice,setNprice]= useState('');
+  const [edSale,setEdSale]= useState(null);
+  const [delS,  setDelS]  = useState(null);
+  const [clrOk, setClrOk] = useState(false);
+
+  useEffect(()=>{LS.set('pos_prods',prods);},[prods]);
+  useEffect(()=>{LS.set('pos_sales',sales);},[sales]);
+  useEffect(()=>{LS.set('pos_nid',nid);},[nid]);
+
+  const setQty  = (id,q) => setCart(p=>({...p,[id]:Math.max(0,q)}));
+  const cItems  = prods.filter(p=>(cart[p.id]||0)>0).map(p=>({...p,qty:cart[p.id]}));
+  const total   = cItems.reduce((s,i)=>s+i.price*i.qty,0);
+  const rcv     = parseInt(rcvIn)||0;
+  const change  = rcv>=total?rcv-total:null;
+  const canPay  = cItems.length>0&&change!==null;
+
+  const checkout = () => {
+    if(!canPay) return;
+    const r={id:Date.now(),time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),items:cItems,total,received:rcv,change:rcv-total};
+    setSales(p=>[r,...p]); setDone(r); setCart({}); setRcvIn('');
+  };
+  const clearCart = () => {setCart({});setRcvIn('');setDone(null);};
+
+  const addProd = () => {
+    const p=parseInt(nprice);
+    if(!nname.trim()||isNaN(p)||p<=0) return;
+    setProds(prev=>[...prev,{id:nid,name:nname.trim(),price:p}]);
+    setNid(n=>n+1);setNname('');setNprice('');
+  };
+  const rmProd  = id => {setProds(p=>p.filter(x=>x.id!==id));setCart(p=>{const c={...p};delete c[id];return c;});};
+  const saveEd  = id => {setProds(p=>p.map(x=>x.id===id?{...x,name:ed.name,price:parseInt(ed.price)||x.price}:x));setEd(null);};
+
+  const startEdSale = s => setEdSale({id:s.id,items:s.items.map(i=>({...i,eQty:String(i.qty),ePrice:String(i.price)}))});
+  const saveEdSale  = () => {
+    setSales(prev=>prev.map(s=>{
+      if(s.id!==edSale.id) return s;
+      const ni=edSale.items.map(i=>({...i,qty:Math.max(0,parseInt(i.eQty)||0),price:Math.max(0,parseInt(i.ePrice)||0)})).filter(i=>i.qty>0);
+      return {...s,items:ni,total:ni.reduce((sum,i)=>sum+i.price*i.qty,0)};
+    }));
+    setEdSale(null);
+  };
+  const delSale = id => {setSales(p=>p.filter(s=>s.id!==id));setDelS(null);if(edSale?.id===id)setEdSale(null);};
+
+  const totSales = sales.reduce((s,r)=>s+r.total,0);
+  const totQty   = sales.reduce((s,r)=>s+r.items.reduce((a,i)=>a+i.qty,0),0);
+
+  const downloadCSV = () => {
+    const rows = [['時刻','商品名','数量','単価','小計','合計','受取','おつり']];
+    sales.forEach(s => {
+      s.items.forEach((item, idx) => {
+        rows.push([
+          idx===0 ? s.time : '',
+          item.name,
+          item.qty,
+          item.price,
+          item.price * item.qty,
+          idx===0 ? s.total : '',
+          idx===0 ? s.received : '',
+          idx===0 ? s.change : '',
+        ]);
+      });
+    });
+    const bom  = '\uFEFF';
+    const csv  = bom + rows.map(r => r.map(v => `"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+    const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'});
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    const date = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'');
+    a.href = url; a.download = `mosslet-sales-${date}.csv`;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a); URL.revokeObjectURL(url);
+  };
+
+  const tabSt = t => ({background:'none',border:'none',borderBottom:`2px solid ${tab===t?C.ac:'transparent'}`,color:tab===t?C.ac:C.mu,padding:'14px 16px 12px',fontSize:12,fontFamily:F.m,letterSpacing:'0.12em',cursor:'pointer',textTransform:'uppercase',transition:'color 0.15s,border-color 0.15s',minHeight:48});
+
+  const inSt = {background:C.hi,border:`1px solid ${C.br}`,borderRadius:4,color:C.tx,fontFamily:F.b,outline:'none',fontVariantNumeric:'tabular-nums'};
+
+  return (
+    <div style={{height:'100%',display:'flex',flexDirection:'column',background:C.bg,fontFamily:F.b,color:C.tx}}>
+
+      {/* Header */}
+      <header style={{background:`${C.bg}e8`,backdropFilter:'blur(12px)',borderBottom:`1px solid ${C.br}`,flexShrink:0,paddingLeft:'env(safe-area-inset-left)',paddingRight:'env(safe-area-inset-right)'}}>
+        <div style={{maxWidth:1200,margin:'0 auto',padding:'0 28px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+          <div style={{display:'flex',alignItems:'baseline',gap:12,padding:'14px 0'}}>
+            <span style={{fontFamily:F.d,fontWeight:300,fontSize:26,letterSpacing:'0.04em'}}>mosslet</span>
+            <span style={{fontFamily:F.m,fontSize:11,color:C.mu,letterSpacing:'0.16em'}}>POS</span>
+          </div>
+          <nav style={{display:'flex'}}>
+            {TABS.map(t=><button key={t} onClick={()=>{setTab(t);setDone(null);}} style={tabSt(t)}>{t}</button>)}
+          </nav>
+        </div>
+      </header>
+
+      {/* Body */}
+      <div style={{flex:1,overflow:'hidden',maxWidth:1200,margin:'0 auto',width:'100%',padding:'0 28px 0',paddingLeft:'calc(28px + env(safe-area-inset-left))',paddingRight:'calc(28px + env(safe-area-inset-right))'}}>
+
+        {/* ══ レジ ══ */}
+        {tab==='レジ' && (done ? (
+          /* 完了 */
+          <div style={{height:'100%',display:'flex',alignItems:'center',justifyContent:'center'}}>
+            <div style={{textAlign:'center',width:'100%',maxWidth:520}}>
+              <div style={{width:76,height:76,borderRadius:'50%',border:`1.5px solid ${C.ac}`,boxShadow:`0 0 0 12px ${C.ac}14`,display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 28px',color:C.ac,fontSize:30}}>✓</div>
+              <div className="num" style={{fontFamily:F.d,fontStyle:'italic',fontWeight:300,fontSize:68,lineHeight:1,letterSpacing:'-0.02em',marginBottom:8}}>{yen(done.total)}</div>
+              <div className="num" style={{fontFamily:F.m,fontSize:13,color:C.mu,letterSpacing:'0.12em',marginBottom:40}}>おつり {yen(done.change)}</div>
+              <Card el ch={<>
+                {done.items.map(i=>(
+                  <div key={i.id} style={{display:'flex',justifyContent:'space-between',padding:'10px 0',borderBottom:`1px solid ${C.br}`,color:C.mu}}>
+                    <span style={{fontFamily:F.d,fontWeight:300,fontSize:18}}>{i.name} × {i.qty}</span>
+                    <span className="num" style={{fontFamily:F.m,fontSize:15}}>{yen(i.price*i.qty)}</span>
+                  </div>
+                ))}
+              </>} st={{textAlign:'left',marginBottom:32}} />
+              <button onClick={clearCart} style={{width:'100%',background:C.ac,border:'none',borderRadius:4,color:C.bg,padding:'18px',fontSize:16,fontFamily:F.b,letterSpacing:'0.08em',cursor:'pointer',minHeight:56}}>次の会計へ</button>
+            </div>
+          </div>
+        ) : (
+          /* 2カラム */
+          <div style={{height:'100%',display:'grid',gridTemplateColumns:'1fr 1fr',gap:24,paddingTop:20,paddingBottom:20}}>
+
+            {/* 左：商品 + カート */}
+            <div className="scroll" style={{display:'flex',flexDirection:'column',gap:18,paddingRight:4}}>
+              <div>
+                <Lbl c="Products" />
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                  {prods.map(p=>{
+                    const q=cart[p.id]||0;
+                    return (
+                      <div key={p.id} style={{background:q>0?C.hi:C.sf,border:`1px solid ${q>0?C.ac:C.br}`,borderRadius:6,padding:'16px 18px',boxShadow:q>0?`0 2px 10px rgba(42,107,80,0.12)`:'none',transition:'all 0.15s'}}>
+                        <div style={{fontFamily:F.d,fontWeight:300,fontSize:18,color:C.tx,marginBottom:2,lineHeight:1.25}}>{p.name}</div>
+                        <div className="num" style={{fontFamily:F.m,fontSize:13,color:C.wm,marginBottom:16}}>{yen(p.price)}</div>
+                        <div style={{display:'flex',alignItems:'center',gap:14}}>
+                          <button onClick={()=>setQty(p.id,q-1)} style={{background:C.hi,border:`1px solid ${C.br}`,borderRadius:4,width:42,height:42,fontSize:22,color:C.mu,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                          <span className="num" style={{fontFamily:F.m,fontSize:22,minWidth:28,textAlign:'center',color:C.tx}}>{q}</span>
+                          <button onClick={()=>setQty(p.id,q+1)} style={{background:q>0?`${C.ac}1a`:C.hi,border:`1px solid ${q>0?C.ac:C.br}`,borderRadius:4,width:42,height:42,fontSize:22,color:q>0?C.ac:C.mu,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>＋</button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <Card el ch={<>
+                <Lbl c="Cart" />
+                {cItems.length===0?(
+                  <div style={{textAlign:'center',padding:'20px 0'}}>
+                    <div style={{fontSize:13,color:C.mu,marginBottom:6}}>商品を選択してください</div>
+                    <div style={{fontFamily:F.m,fontSize:11,color:`${C.mu}88`,letterSpacing:'0.08em'}}>↑ ボタンで数量を追加</div>
+                  </div>
+                ):(
+                  cItems.map(i=>(
+                    <div key={i.id} style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',padding:'9px 0',borderBottom:`1px solid ${C.br}`}}>
+                      <span style={{fontFamily:F.d,fontWeight:300,fontSize:17,color:C.mu}}>{i.name} <span style={{fontSize:14}}>× {i.qty}</span></span>
+                      <span className="num" style={{fontFamily:F.m,fontSize:15,color:C.tx}}>{yen(i.price*i.qty)}</span>
+                    </div>
+                  ))
+                )}
+                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:16,paddingTop:14,borderTop:`1px solid ${C.br}`}}>
+                  <span style={{fontFamily:F.d,fontStyle:'italic',fontWeight:300,fontSize:20,color:C.mu}}>合計</span>
+                  <span className="num" style={{fontFamily:F.d,fontWeight:600,fontSize:44,color:C.tx,letterSpacing:'-0.01em'}}>{yen(total)}</span>
+                </div>
+              </>} />
+            </div>
+
+            {/* 右：受取 + おつり + 決済 */}
+            <div style={{display:'flex',flexDirection:'column',gap:18}}>
+              <Card el st={{flex:1}} ch={<>
+                <Lbl c="Received" />
+                <input type="number" value={rcvIn} onChange={e=>setRcvIn(e.target.value)} placeholder="受取金額を入力"
+                  style={{...inSt,width:'100%',padding:'16px',fontSize:24,marginBottom:14}} />
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10,marginBottom:total>0?10:0}}>
+                  {QUICK.map(a=>(
+                    <button key={a} onClick={()=>setRcvIn(String(a))} className="num"
+                      style={{background:C.hi,border:`1px solid ${C.br}`,borderRadius:4,color:C.mu,padding:'13px 0',fontFamily:F.m,fontSize:14,cursor:'pointer',minHeight:52,transition:'background 0.15s'}}>
+                      {yen(a)}
+                    </button>
+                  ))}
+                </div>
+                {total>0&&(
+                  <button onClick={()=>setRcvIn(String(total))}
+                    style={{width:'100%',background:`${C.ac}12`,border:`1px solid ${C.ac}55`,borderRadius:4,color:C.ac,padding:'13px',fontFamily:F.m,fontSize:14,letterSpacing:'0.08em',cursor:'pointer',minHeight:52}}>
+                    ちょうど {yen(total)}
+                  </button>
+                )}
+                {rcv>0&&total>0&&(
+                  <div className="num" style={{marginTop:16,padding:'18px',borderRadius:4,background:change!==null?`${C.ac}12`:`${C.dg}10`,border:`1px solid ${change!==null?`${C.ac}44`:`${C.dg}44`}`,fontFamily:F.m,fontSize:17,color:change!==null?C.ac:C.dg,fontVariantNumeric:'tabular-nums'}}>
+                    {change!==null
+                      ?<span>おつり <strong style={{fontSize:30}}>{yen(change)}</strong></span>
+                      :<span>不足 <strong style={{fontSize:26}}>{yen(total-rcv)}</strong></span>
+                    }
+                  </div>
+                )}
+              </>} />
+
+              <div style={{display:'flex',gap:12}}>
+                <button onClick={clearCart} style={{flex:1,background:'transparent',border:`1px solid ${C.br}`,borderRadius:4,color:C.mu,padding:'18px',fontSize:15,fontFamily:F.b,cursor:'pointer',minHeight:60}}>クリア</button>
+                <button onClick={checkout} disabled={!canPay}
+                  style={{flex:2,background:canPay?C.ac:C.br,border:'none',borderRadius:4,color:canPay?C.bg:C.mu,padding:'18px',fontSize:17,fontFamily:F.b,letterSpacing:'0.06em',cursor:canPay?'pointer':'not-allowed',transition:'background 0.15s',minHeight:60}}>
+                  会計確定
+                </button>
+              </div>
+            </div>
+
+          </div>
+        ))}
+
+        {/* ══ 商品管理 ══ */}
+        {tab==='商品管理'&&(
+          <div className="scroll" style={{height:'100%',paddingTop:20,paddingBottom:20}}>
+            <Lbl c="Product List" />
+            {prods.map(p=>(
+              <Card key={p.id} st={{marginBottom:10}} ch={
+                ed?.id===p.id?(
+                  <div style={{display:'flex',gap:10,alignItems:'center',flexWrap:'wrap'}}>
+                    <input value={ed.name} onChange={e=>setEd(v=>({...v,name:e.target.value}))} placeholder="商品名"
+                      style={{...inSt,flex:1,minWidth:160,padding:'11px 14px',fontSize:15}} />
+                    <input type="number" value={ed.price} onChange={e=>setEd(v=>({...v,price:e.target.value}))} placeholder="価格"
+                      style={{...inSt,width:120,padding:'11px 12px',fontSize:15,textAlign:'right'}} />
+                    <button onClick={()=>saveEd(p.id)} style={{background:'transparent',border:`1px solid ${C.wm}55`,borderRadius:4,color:C.wm,padding:'11px 20px',fontSize:13,fontFamily:F.m,cursor:'pointer',minHeight:44}}>保存</button>
+                    <GB label="✕" onClick={()=>setEd(null)} />
+                  </div>
+                ):(
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <div>
+                      <div style={{fontFamily:F.d,fontWeight:300,fontSize:20,color:C.tx}}>{p.name}</div>
+                      <div className="num" style={{fontFamily:F.m,fontSize:13,color:C.wm,marginTop:2}}>{yen(p.price)}</div>
+                    </div>
+                    <div style={{display:'flex',gap:8}}>
+                      <GB label="編集" onClick={()=>setEd({id:p.id,name:p.name,price:p.price})} />
+                      <GB label="削除" onClick={()=>rmProd(p.id)} col={C.dg} bcol={`${C.dg}44`} />
+                    </div>
+                  </div>
+                )
+              } />
+            ))}
+            <Card da st={{marginTop:24}} ch={<>
+              <Lbl c="Add Product" />
+              <div style={{display:'flex',gap:10,marginBottom:12,flexWrap:'wrap'}}>
+                <input value={nname} onChange={e=>setNname(e.target.value)} placeholder="商品名"
+                  style={{...inSt,flex:1,minWidth:160,padding:'11px 14px',fontSize:15}} />
+                <input type="number" value={nprice} onChange={e=>setNprice(e.target.value)} placeholder="価格"
+                  style={{...inSt,width:120,padding:'11px 12px',fontSize:15,textAlign:'right'}} />
+              </div>
+              <button onClick={addProd} style={{width:'100%',background:'transparent',border:`1px solid ${C.ac}66`,borderRadius:4,color:C.ac,padding:'13px',fontSize:13,fontFamily:F.m,letterSpacing:'0.1em',cursor:'pointer',minHeight:50}}>＋ 追加</button>
+            </>} />
+          </div>
+        )}
+
+        {/* ══ 売上履歴 ══ */}
+        {tab==='売上履歴'&&(
+          <div className="scroll" style={{height:'100%',paddingTop:20,paddingBottom:20}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,marginBottom:24}}>
+              <Card el ch={<><Lbl c="Total Sales" /><div className="num" style={{fontFamily:F.d,fontStyle:'italic',fontWeight:300,fontSize:42,color:C.tx,letterSpacing:'-0.01em'}}>{yen(totSales)}</div></>} />
+              <Card el ch={<><Lbl c="Items Sold" /><div className="num" style={{fontFamily:F.d,fontStyle:'italic',fontWeight:300,fontSize:42,color:C.tx}}>{totQty}</div><div className="num" style={{fontFamily:F.m,fontSize:11,color:C.mu,marginTop:4}}>{sales.length} 件</div></>} />
+            </div>
+
+            <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:14}}>
+              <Lbl c="History" style={{marginBottom:0}} />
+              <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                {sales.length>0&&<GB label="CSVダウンロード" onClick={downloadCSV} col={C.ac} bcol={`${C.ac}55`} />}
+                {sales.length>0&&!clrOk&&<GB label="全消去" onClick={()=>setClrOk(true)} col={C.dg} bcol={`${C.dg}44`} />}
+              </div>
+              {clrOk&&(
+                <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                  <span style={{fontFamily:F.m,fontSize:12,color:C.dg}}>すべて削除しますか？</span>
+                  <button onClick={()=>{setSales([]);setClrOk(false);}} style={{background:C.dg,border:'none',borderRadius:4,color:C.bg,padding:'9px 16px',fontSize:12,fontFamily:F.m,cursor:'pointer',minHeight:44}}>削除</button>
+                  <GB label="キャンセル" onClick={()=>setClrOk(false)} />
+                </div>
+              )}
+            </div>
+
+            {sales.length===0?(
+              <div style={{textAlign:'center',padding:'64px 0'}}>
+                <div style={{fontFamily:F.m,fontSize:12,color:C.mu,letterSpacing:'0.1em',marginBottom:16}}>まだ売上がありません</div>
+                <GB label="レジへ" onClick={()=>setTab('レジ')} col={C.ac} bcol={`${C.ac}66`} />
+              </div>
+            ):sales.map(s=>{
+              const isEd=edSale?.id===s.id,isDel=delS===s.id;
+              const edTot=isEd?edSale.items.reduce((sum,i)=>sum+(parseInt(i.ePrice)||0)*(parseInt(i.eQty)||0),0):s.total;
+              return (
+                <Card key={s.id} st={{marginBottom:10}} ch={<>
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginBottom:isEd?14:8}}>
+                    <span style={{fontFamily:F.m,fontSize:11,color:C.mu,letterSpacing:'0.08em'}}>{s.time}</span>
+                    <div style={{display:'flex',alignItems:'baseline',gap:12}}>
+                      <span className="num" style={{fontFamily:F.d,fontStyle:'italic',fontWeight:300,fontSize:30,color:C.tx}}>{yen(isEd?edTot:s.total)}</span>
+                      {!isEd&&!isDel&&(
+                        <div style={{display:'flex',gap:6}}>
+                          <button onClick={()=>{setDelS(null);startEdSale(s);}} style={{background:'transparent',border:`1px solid ${C.br}`,borderRadius:4,color:C.mu,padding:'7px 14px',fontSize:12,fontFamily:F.m,cursor:'pointer',minHeight:38}}>編集</button>
+                          <button onClick={()=>{setEdSale(null);setDelS(s.id);}} style={{background:'transparent',border:`1px solid ${C.dg}44`,borderRadius:4,color:C.dg,padding:'7px 14px',fontSize:12,fontFamily:F.m,cursor:'pointer',minHeight:38}}>削除</button>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  {!isEd&&!isDel&&s.items.map(i=>(
+                    <div key={i.id} style={{display:'flex',justifyContent:'space-between',fontSize:13,color:C.mu,padding:'3px 0'}}>
+                      <span style={{fontFamily:F.d,fontWeight:300,fontSize:15}}>{i.name} × {i.qty}</span>
+                      <span className="num" style={{fontFamily:F.m}}>{yen(i.price*i.qty)}</span>
+                    </div>
+                  ))}
+                  {isDel&&<DelConfirm label="この取引を削除しますか？" onOk={()=>delSale(s.id)} onNo={()=>setDelS(null)} />}
+                  {isEd&&(<>
+                    {edSale.items.map((item,idx)=>(
+                      <div key={item.id} style={{display:'grid',gridTemplateColumns:'1fr 90px 100px',gap:10,alignItems:'center',padding:'9px 0',borderBottom:`1px solid ${C.br}`}}>
+                        <span style={{fontFamily:F.d,fontWeight:300,fontSize:15}}>{item.name}</span>
+                        <div>
+                          <div style={{fontFamily:F.m,fontSize:10,color:C.mu,marginBottom:3,letterSpacing:'0.08em'}}>数量</div>
+                          <input type="number" value={item.eQty}
+                            onChange={e=>setEdSale(prev=>({...prev,items:prev.items.map((x,i)=>i===idx?{...x,eQty:e.target.value}:x)}))}
+                            style={{...inSt,width:'100%',padding:'9px 8px',fontSize:15,textAlign:'right'}} />
+                        </div>
+                        <div>
+                          <div style={{fontFamily:F.m,fontSize:10,color:C.mu,marginBottom:3,letterSpacing:'0.08em'}}>単価</div>
+                          <input type="number" value={item.ePrice}
+                            onChange={e=>setEdSale(prev=>({...prev,items:prev.items.map((x,i)=>i===idx?{...x,ePrice:e.target.value}:x)}))}
+                            style={{...inSt,width:'100%',padding:'9px 8px',fontSize:15,textAlign:'right'}} />
+                        </div>
+                      </div>
+                    ))}
+                    <div style={{display:'flex',gap:8,marginTop:12,justifyContent:'flex-end'}}>
+                      <GB label="キャンセル" onClick={()=>setEdSale(null)} />
+                      <button onClick={saveEdSale} style={{background:C.ac,border:'none',borderRadius:4,color:C.bg,padding:'9px 22px',fontSize:13,fontFamily:F.m,cursor:'pointer',letterSpacing:'0.08em',minHeight:44}}>保存</button>
+                    </div>
+                  </>)}
+                </>} />
+              );
+            })}
+          </div>
+        )}
+
+      </div>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>

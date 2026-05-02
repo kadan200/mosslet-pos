@@ -555,6 +555,48 @@ function App() {
         {/* ══ 商品管理 ══ */}
         {tab==='商品管理'&&(
           <div className="scroll fade-up" style={{height:'100%',paddingTop:20,paddingBottom:20}}>
+
+            {/* エクスポート・インポート */}
+            <div style={{display:'flex',gap:8,marginBottom:20,alignItems:'center',flexWrap:'wrap'}}>
+              <button onClick={()=>{
+                const json = JSON.stringify({version:1, prods, nid}, null, 2);
+                const blob = new Blob([json],{type:'application/json'});
+                const url  = URL.createObjectURL(blob);
+                const a    = document.createElement('a');
+                const date = new Date().toLocaleDateString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit'}).replace(/\//g,'');
+                a.href=url; a.download=`mosslet-products-${date}.json`;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+              }} className="gb" style={{color:C.sage,borderColor:C.sageBorder}}>
+                ↓ 商品データをエクスポート
+              </button>
+              <label style={{
+                display:'inline-flex',alignItems:'center',
+                background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,
+                color:C.body,padding:'8px 18px',fontSize:12,cursor:'pointer',minHeight:40,
+                fontFamily:'var(--fb)',letterSpacing:'0.02em',
+              }}>
+                ↑ インポート
+                <input type="file" accept="application/json,.json" style={{display:'none'}} onChange={e=>{
+                  const f=e.target.files[0]; if(!f) return;
+                  const r=new FileReader();
+                  r.onload=ev=>{
+                    try{
+                      const d=JSON.parse(ev.target.result);
+                      if(d.prods&&Array.isArray(d.prods)){
+                        if(window.confirm(`${d.prods.length}件の商品データを読み込みます。現在のデータは上書きされます。よろしいですか？`)){
+                          setProds(d.prods);
+                          if(d.nid) setNid(d.nid);
+                        }
+                      } else { alert('商品データが見つかりませんでした。'); }
+                    } catch{ alert('JSONの読み込みに失敗しました。'); }
+                  };
+                  r.readAsText(f);
+                  e.target.value='';
+                }}/>
+              </label>
+              <span style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,letterSpacing:'0.06em'}}>JSONで保存・復元できます</span>
+            </div>
+
             <Lbl c="Product List" />
             {prods.map(p=>(
               <div key={p.id} className="card" style={{marginBottom:10,overflow:'hidden'}}>

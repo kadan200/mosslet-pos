@@ -194,8 +194,8 @@ const C = {
 };
 
 const PRODS0 = [
-  {id:1, name:'ポストカード 1枚',           price:100,  thumb:null, variant:''},
-  {id:2, name:'ポストカード 12枚フルセット',  price:1000, thumb:null, variant:''},
+  {id:1, name:'ポストカード 1枚',           price:100,  thumb:null, variant:'', category:'ポストカード'},
+  {id:2, name:'ポストカード 12枚フルセット',  price:1000, thumb:null, variant:'', category:'セット'},
 ];
 const QUICK = [500,1000,2000,5000,10000];
 const TABS  = ['レジ','商品管理','売上履歴'];
@@ -397,6 +397,8 @@ function App() {
   const [nprice, setNprice] = useState('');
   const [nthumb, setNthumb] = useState(null);
   const [nvar,   setNvar]   = useState('');
+  const [ncat,   setNcat]   = useState('');
+  const [catFilter, setCatFilter] = useState('すべて');
   const [edSale, setEdSale] = useState(null);
   const [delS,   setDelS]   = useState(null);
   const [clrOk,  setClrOk]  = useState(false);
@@ -422,11 +424,11 @@ function App() {
   const addProd = ()=>{
     const p=parseInt(nprice);
     if(!nname.trim()||isNaN(p)||p<=0) return;
-    setProds(prev=>[...prev,{id:nid,name:nname.trim(),price:p,thumb:nthumb,variant:nvar.trim()}]);
-    setNid(n=>n+1); setNname(''); setNprice(''); setNthumb(null); setNvar('');
+    setProds(prev=>[...prev,{id:nid,name:nname.trim(),price:p,thumb:nthumb,variant:nvar.trim(),category:ncat.trim()}]);
+    setNid(n=>n+1); setNname(''); setNprice(''); setNthumb(null); setNvar(''); setNcat('');
   };
   const rmProd = id=>{setProds(p=>p.filter(x=>x.id!==id));setCart(p=>{const c={...p};delete c[id];return c;});};
-  const saveEd = id=>{setProds(p=>p.map(x=>x.id===id?{...x,name:ed.name,price:parseInt(ed.price)||x.price,thumb:ed.thumb,variant:ed.variant}:x));setEd(null);};
+  const saveEd = id=>{setProds(p=>p.map(x=>x.id===id?{...x,name:ed.name,price:parseInt(ed.price)||x.price,thumb:ed.thumb,variant:ed.variant,category:ed.category||''}:x));setEd(null);};
 
   const startEdSale = s=>setEdSale({id:s.id,items:s.items.map(i=>({...i,eQty:String(i.qty),ePrice:String(i.price)}))});
   const saveEdSale  = ()=>{
@@ -511,9 +513,32 @@ function App() {
 
             {/* 左：商品グリッド */}
             <div className="scroll fade-up" style={{paddingRight:4}}>
-              <Lbl c="Products" />
+              {/* カテゴリーフィルター */}
+              {(()=>{
+                const cats = ['すべて', ...Array.from(new Set(prods.map(p=>p.category||'').filter(Boolean)))];
+                return cats.length>1 ? (
+                  <div style={{display:'flex',gap:6,flexWrap:'wrap',marginBottom:12}}>
+                    {cats.map(cat=>(
+                      <button key={cat} onClick={()=>setCatFilter(cat)} style={{
+                        background: catFilter===cat ? C.sage : C.card,
+                        border: `1px solid ${catFilter===cat ? C.sage : C.border}`,
+                        borderRadius:999,
+                        color: catFilter===cat ? '#fff' : C.body,
+                        padding:'6px 14px',
+                        fontSize:12,
+                        fontFamily:'var(--fb)',
+                        cursor:'pointer',
+                        transition:'background 0.15s,border-color 0.15s,color 0.15s',
+                        minHeight:34,
+                        letterSpacing:'0.02em',
+                      }}>{cat}</button>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-                {prods.map(p=>{
+                {/* catFilterで絞り込み */}
+                {prods.filter(p=>catFilter==='すべて'||(p.category||'')=== catFilter).map(p=>{
                   const q=cart[p.id]||0;
                   return (
                     <div key={p.id} className={`prod-card${q>0?' sel':''}`}>
@@ -647,6 +672,7 @@ function App() {
                       <div style={{flex:1,display:'flex',flexDirection:'column',gap:8}}>
                         <input value={ed.name} onChange={e=>setEd(v=>({...v,name:e.target.value}))} placeholder="商品名" className="inp" style={p_inp}/>
                         <input value={ed.variant||''} onChange={e=>setEd(v=>({...v,variant:e.target.value}))} placeholder="バリアント名（例：春の野原、夕暮れ）" className="inp" style={{...p_inp,fontSize:13}}/>
+                        <input value={ed.category||''} onChange={e=>setEd(v=>({...v,category:e.target.value}))} placeholder="カテゴリー（例：ポストカード、セット、グッズ）" className="inp" style={{...p_inp,fontSize:13}}/>
                         <input type="number" value={ed.price} onChange={e=>setEd(v=>({...v,price:e.target.value}))} placeholder="価格" className="inp" style={{...p_inp,width:140,textAlign:'right'}}/>
                       </div>
                     </div>
@@ -662,11 +688,14 @@ function App() {
                     </div>
                     <div style={{flex:1,minWidth:0}}>
                       <div style={{fontWeight:500,fontSize:16,color:C.ink}}>{p.name}</div>
-                      {p.variant&&<div style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,letterSpacing:'0.06em',marginTop:2}}>{p.variant}</div>}
+                      <div style={{display:'flex',alignItems:'center',gap:6,marginTop:2,flexWrap:'wrap'}}>
+                        {p.category&&<span style={{fontFamily:'var(--fm)',fontSize:9,letterSpacing:'0.1em',background:C.sageBg,color:C.sage,border:`1px solid ${C.sageBorder}`,borderRadius:999,padding:'1px 8px'}}>{p.category}</span>}
+                        {p.variant&&<span style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,letterSpacing:'0.06em'}}>{p.variant}</span>}
+                      </div>
                       <div className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.sage,fontWeight:500,marginTop:3}}>{yen(p.price)}</div>
                     </div>
                     <div style={{display:'flex',gap:8,flexShrink:0}}>
-                      <button onClick={()=>setEd({id:p.id,name:p.name,price:String(p.price),thumb:p.thumb||null,variant:p.variant||''})} className="gb">編集</button>
+                      <button onClick={()=>setEd({id:p.id,name:p.name,price:String(p.price),thumb:p.thumb||null,variant:p.variant||'',category:p.category||''})} className="gb">編集</button>
                       <button onClick={()=>rmProd(p.id)} className="gb" style={{color:C.danger,borderColor:`${C.danger}55`}}>削除</button>
                     </div>
                   </div>
@@ -686,6 +715,9 @@ function App() {
               </div>
               <div style={{padding:'0.625rem 1.5rem 0'}}>
                 <input value={nvar} onChange={e=>setNvar(e.target.value)} placeholder="バリアント名（例：春の野原・ツバメ）— 同一価格で絵柄違いの場合" className="inp" style={{...p_inp,fontSize:13}}/>
+              </div>
+              <div style={{padding:'0.5rem 1.5rem 0'}}>
+                <input value={ncat} onChange={e=>setNcat(e.target.value)} placeholder="カテゴリー（例：ポストカード、セット、グッズ）— 任意テキスト" className="inp" style={{...p_inp,fontSize:13}}/>
               </div>
               <div style={{padding:'1rem 1.5rem 1.25rem'}}>
                 <button onClick={addProd} style={{width:'100%',background:C.sage,border:'none',borderRadius:999,color:'#fff',padding:'13px',fontSize:13,fontWeight:500,letterSpacing:'0.06em',cursor:'pointer',minHeight:48}}>＋ 追加</button>

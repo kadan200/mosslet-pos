@@ -450,73 +450,109 @@ function App() {
         ):(
           <div style={{height:'100%',display:'grid',gridTemplateColumns:'1fr 1fr',gap:24,paddingTop:20,paddingBottom:20}}>
 
-            {/* 左：商品 + カート */}
-            <div className="scroll fade-up" style={{display:'flex',flexDirection:'column',gap:16,paddingRight:4}}>
-              <div>
-                <Lbl c="Products" />
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-                  {prods.map(p=>{
-                    const q=cart[p.id]||0;
-                    return (
-                      <div key={p.id} className={`prod-card${q>0?' sel':''}`}>
-                        {p.thumb?(
-                          <div style={{width:'100%',aspectRatio:'3/2',position:'relative',overflow:'hidden',borderRadius:'1rem 1rem 0 0'}}>
-                            <img src={p.thumb} alt={p.name} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',display:'block',transition:'transform 0.38s ease'}}
-                              onMouseEnter={e=>e.currentTarget.style.transform='scale(1.04)'}
-                              onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}
-                            />
-                          </div>
-                        ):(
-                          <div style={{width:'100%',aspectRatio:'3/2',background:C.bgAlt,display:'flex',alignItems:'center',justifyContent:'center',color:C.border,borderBottom:`1px solid ${C.border}`,borderRadius:'1rem 1rem 0 0'}}>
-                            <IcoImg size={22}/>
-                          </div>
-                        )}
-                        <div style={{padding:'12px 14px'}}>
-                          <div style={{fontWeight:500,fontSize:14,color:C.ink,lineHeight:1.3,marginBottom:2}}>{p.name}</div>
-                          {p.variant&&<div style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,letterSpacing:'0.06em',marginBottom:4}}>{p.variant}</div>}
-                          <div className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.sage,fontWeight:500,marginBottom:12}}>{yen(p.price)}</div>
-                          <div style={{display:'flex',alignItems:'center',gap:8}}>
-                            <button onClick={()=>setQty(p.id,q-1)} style={{background:C.bgAlt,border:`1px solid ${C.border}`,borderRadius:'0.5rem',width:36,height:36,fontSize:18,color:C.muted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
-                            <span className="num" style={{fontFamily:'var(--fm)',fontSize:18,minWidth:22,textAlign:'center',color:C.ink,fontWeight:q>0?600:400}}>{q}</span>
-                            <button onClick={()=>setQty(p.id,q+1)} style={{background:q>0?C.sage:C.bgAlt,border:`1px solid ${q>0?C.sage:C.border}`,borderRadius:'0.5rem',width:36,height:36,fontSize:18,color:q>0?'#fff':C.muted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.15s,border-color 0.15s'}}>＋</button>
-                          </div>
+            {/* 左：商品グリッド */}
+            <div className="scroll fade-up" style={{paddingRight:4}}>
+              <Lbl c="Products" />
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+                {prods.map(p=>{
+                  const q=cart[p.id]||0;
+                  return (
+                    <div key={p.id} className={`prod-card${q>0?' sel':''}`}>
+                      {p.thumb?(
+                        <div style={{width:'100%',aspectRatio:'3/2',position:'relative',overflow:'hidden',borderRadius:'1rem 1rem 0 0'}}>
+                          <img src={p.thumb} alt={p.name} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',display:'block',transition:'transform 0.38s ease'}}
+                            onMouseEnter={e=>e.currentTarget.style.transform='scale(1.04)'}
+                            onMouseLeave={e=>e.currentTarget.style.transform='scale(1)'}
+                          />
+                        </div>
+                      ):(
+                        <div style={{width:'100%',aspectRatio:'3/2',background:C.bgAlt,display:'flex',alignItems:'center',justifyContent:'center',color:C.border,borderBottom:`1px solid ${C.border}`,borderRadius:'1rem 1rem 0 0'}}>
+                          <IcoImg size={22}/>
+                        </div>
+                      )}
+                      <div style={{padding:'12px 14px'}}>
+                        <div style={{fontWeight:500,fontSize:14,color:C.ink,lineHeight:1.3,marginBottom:2}}>{p.name}</div>
+                        {p.variant&&<div style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,letterSpacing:'0.06em',marginBottom:4}}>{p.variant}</div>}
+                        <div className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.sage,fontWeight:500,marginBottom:12}}>{yen(p.price)}</div>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <button onClick={()=>setQty(p.id,q-1)} style={{background:C.bgAlt,border:`1px solid ${C.border}`,borderRadius:'0.5rem',width:36,height:36,fontSize:18,color:C.muted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
+                          <span className="num" style={{fontFamily:'var(--fm)',fontSize:18,minWidth:22,textAlign:'center',color:C.ink,fontWeight:q>0?600:400}}>{q}</span>
+                          <button onClick={()=>setQty(p.id,q+1)} style={{background:q>0?C.sage:C.bgAlt,border:`1px solid ${q>0?C.sage:C.border}`,borderRadius:'0.5rem',width:36,height:36,fontSize:18,color:q>0?'#fff':C.muted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.15s,border-color 0.15s'}}>＋</button>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              <div className="card" style={{padding:'1.25rem 1.5rem'}}>
-                <Lbl c="Cart" />
-                {cItems.length===0?(
-                  <div style={{textAlign:'center',padding:'1.25rem 0'}}>
-                    <div style={{fontFamily:'var(--fm)',fontSize:11,color:C.muted,letterSpacing:'0.08em',marginBottom:4}}>商品を選択してください</div>
-                    <div style={{fontFamily:'var(--fm)',fontSize:10,color:C.border,letterSpacing:'0.06em'}}>↑ ＋ボタンで数量を追加</div>
-                  </div>
-                ):cItems.map(i=>(
-                  <div key={i.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'8px 0',borderBottom:`1px solid ${C.border}`}}>
-                    <div style={{display:'flex',alignItems:'center',gap:8}}>
-                      {i.thumb&&<img src={i.thumb} alt="" style={{width:28,height:28,borderRadius:'0.375rem',objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>}
-                      <div>
-                        <span style={{fontSize:14,color:C.body}}>{i.name}</span>
-                        {i.variant&&<span style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,marginLeft:6}}>{i.variant}</span>}
-                        <span style={{fontFamily:'var(--fm)',fontSize:12,color:C.muted,marginLeft:6}}>× {i.qty}</span>
-                      </div>
                     </div>
-                    <span className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.ink,flexShrink:0}}>{yen(i.price*i.qty)}</span>
-                  </div>
-                ))}
-                <div style={{display:'flex',justifyContent:'space-between',alignItems:'baseline',marginTop:14,paddingTop:12,borderTop:`1px solid ${C.border}`}}>
-                  <span style={{fontFamily:'var(--fd)',fontStyle:'italic',fontWeight:400,fontSize:18,color:C.muted}}>合計</span>
-                  <span className="num" style={{fontFamily:'var(--fd)',fontWeight:400,fontSize:'clamp(2rem,5vw,2.75rem)',color:C.ink,lineHeight:1}}>{yen(total)}</span>
-                </div>
+                  );
+                })}
               </div>
             </div>
 
-            {/* 右：受取・おつり・決済 */}
-            <div style={{display:'flex',flexDirection:'column',gap:16}}>
-              <div className="card fade-up" style={{flex:1,padding:'1.25rem 1.5rem'}}>
+            {/* 右：Cart + Received + 決済 */}
+            <div style={{display:'flex',flexDirection:'column',gap:16,minHeight:0}}>
+
+              {/* Cart — アコーディオン */}
+              {(()=>{
+                const [cartOpen, setCartOpen] = React.useState(false);
+                return (
+                  <div className="card fade-up" style={{flexShrink:0}}>
+                    {/* ヘッダー（常時表示）— クリックで開閉 */}
+                    <button onClick={()=>setCartOpen(o=>!o)} style={{
+                      width:'100%', background:'none', border:'none', cursor:'pointer',
+                      padding:'1rem 1.25rem', display:'flex', alignItems:'center', justifyContent:'space-between',
+                      borderBottom: cartOpen&&cItems.length>0 ? `1px solid ${C.border}` : 'none',
+                      borderRadius:'1.5rem',
+                    }}>
+                      <div style={{display:'flex',alignItems:'center',gap:10}}>
+                        <span style={{fontFamily:'var(--fm)',fontSize:10,letterSpacing:'0.16em',textTransform:'uppercase',color:C.muted}}>Cart</span>
+                        {cItems.length>0&&(
+                          <span style={{background:C.sage,color:'#fff',borderRadius:999,fontFamily:'var(--fm)',fontSize:10,padding:'1px 8px',letterSpacing:'0.06em'}}>
+                            {cItems.reduce((s,i)=>s+i.qty,0)}点
+                          </span>
+                        )}
+                      </div>
+                      <div style={{display:'flex',alignItems:'center',gap:14}}>
+                        {cItems.length>0&&(
+                          <span className="num" style={{fontFamily:'var(--fd)',fontWeight:400,fontSize:'clamp(1.5rem,3.5vw,2rem)',color:C.ink,lineHeight:1}}>{yen(total)}</span>
+                        )}
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.muted} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                          style={{transform:cartOpen?'rotate(180deg)':'rotate(0deg)',transition:'transform 0.22s ease',flexShrink:0}}>
+                          <polyline points="6 9 12 15 18 9"/>
+                        </svg>
+                      </div>
+                    </button>
+
+                    {/* 展開部分 */}
+                    {cartOpen&&(
+                      <div style={{padding:'0.875rem 1.25rem 1.25rem'}}>
+                        {cItems.length===0?(
+                          <div style={{textAlign:'center',padding:'0.75rem 0'}}>
+                            <div style={{fontFamily:'var(--fm)',fontSize:11,color:C.muted,letterSpacing:'0.08em',marginBottom:2}}>商品を選択してください</div>
+                            <div style={{fontFamily:'var(--fm)',fontSize:10,color:C.border,letterSpacing:'0.06em'}}>← ＋ボタンで数量を追加</div>
+                          </div>
+                        ):(
+                          <div style={{maxHeight:260,overflowY:'auto'}}>
+                            {cItems.map(i=>(
+                              <div key={i.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',padding:'7px 0',borderBottom:`1px solid ${C.border}`}}>
+                                <div style={{display:'flex',alignItems:'center',gap:8}}>
+                                  {i.thumb&&<img src={i.thumb} alt="" style={{width:26,height:26,borderRadius:'0.375rem',objectFit:'cover',flexShrink:0,border:`1px solid ${C.border}`}}/>}
+                                  <div>
+                                    <span style={{fontSize:13,color:C.body}}>{i.name}</span>
+                                    {i.variant&&<span style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,marginLeft:5}}>{i.variant}</span>}
+                                    <span style={{fontFamily:'var(--fm)',fontSize:11,color:C.muted,marginLeft:5}}>× {i.qty}</span>
+                                  </div>
+                                </div>
+                                <span className="num" style={{fontFamily:'var(--fm)',fontSize:14,color:C.ink,flexShrink:0}}>{yen(i.price*i.qty)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
+              {/* Received */}
+              <div className="card fade-up" style={{flex:1,padding:'1.25rem 1.5rem',overflowY:'auto'}}>
                 <Lbl c="Received" />
                 <input type="number" value={rcvIn} onChange={e=>setRcvIn(e.target.value)} placeholder="受取金額を入力"
                   className="inp" style={{...p_inp,fontSize:22,marginBottom:12}}/>
@@ -544,7 +580,8 @@ function App() {
                   </div>
                 )}
               </div>
-              <div style={{display:'flex',gap:10}}>
+
+              <div style={{display:'flex',gap:10,flexShrink:0}}>
                 <button onClick={clearCart} style={{flex:1,background:'transparent',border:`1px solid ${C.border}`,borderRadius:999,color:C.muted,padding:'16px',fontSize:14,cursor:'pointer',minHeight:56}}>クリア</button>
                 <button onClick={checkout} disabled={!canPay} style={{flex:2,background:canPay?C.sage:C.border,border:'none',borderRadius:999,color:canPay?'#fff':C.muted,padding:'16px',fontSize:16,fontWeight:500,cursor:canPay?'pointer':'not-allowed',transition:'background 0.2s',minHeight:56}}>会計確定</button>
               </div>

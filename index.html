@@ -194,8 +194,8 @@ const C = {
 };
 
 const PRODS0 = [
-  {id:1, name:'ポストカード 1枚',           price:100,  thumb:null, variant:'', category:'ポストカード'},
-  {id:2, name:'ポストカード 12枚フルセット',  price:1000, thumb:null, variant:'', category:'セット'},
+  {id:1, name:'ポストカード 1枚',           price:100,  thumb:null, variant:'', category:'ポストカード', stock:null},
+  {id:2, name:'ポストカード 12枚フルセット',  price:1000, thumb:null, variant:'', category:'セット', stock:null},
 ];
 const QUICK = [500,1000,2000,5000,10000];
 const TABS  = ['レジ','商品管理','売上履歴'];
@@ -398,6 +398,7 @@ function App() {
   const [nthumb, setNthumb] = useState(null);
   const [nvar,   setNvar]   = useState('');
   const [ncat,   setNcat]   = useState('');
+  const [nstock, setNstock] = useState('');
   const [catFilter, setCatFilter] = useState('すべて');
   const [edSale, setEdSale] = useState(null);
   const [delS,   setDelS]   = useState(null);
@@ -407,7 +408,11 @@ function App() {
   useEffect(()=>{LS.set('pos_sales', sales);},[sales]);
   useEffect(()=>{LS.set('pos_nid',   nid);  },[nid]);
 
-  const setQty = (id,q)=>setCart(p=>({...p,[id]:Math.max(0,q)}));
+  const setQty = (id,q)=>{
+    const prod=prods.find(p=>p.id===id);
+    const max=prod&&prod.stock!==null&&prod.stock!==undefined ? prod.stock : 999;
+    setCart(p=>({...p,[id]:Math.max(0,Math.min(q,max))}));
+  };
   const cItems = prods.filter(p=>(cart[p.id]||0)>0).map(p=>({...p,qty:cart[p.id]}));
   const total  = cItems.reduce((s,i)=>s+i.price*i.qty,0);
   const rcv    = parseInt(rcvIn)||0;
@@ -417,18 +422,24 @@ function App() {
   const checkout = ()=>{
     if(!canPay) return;
     const r={id:Date.now(),time:new Date().toLocaleTimeString('ja-JP',{hour:'2-digit',minute:'2-digit'}),items:cItems,total,received:rcv,change:rcv-total};
-    setSales(p=>[r,...p]); setDone(r); setCart({}); setRcvIn('');
+    setSales(p=>[r,...p]);
+    setProds(prev=>prev.map(p=>{
+      const sold=cItems.find(i=>i.id===p.id);
+      if(!sold||p.stock===null||p.stock===undefined) return p;
+      return {...p, stock:Math.max(0, p.stock-sold.qty)};
+    }));
+    setDone(r); setCart({}); setRcvIn('');
   };
   const clearCart = ()=>{setCart({}); setRcvIn(''); setDone(null);};
 
   const addProd = ()=>{
     const p=parseInt(nprice);
     if(!nname.trim()||isNaN(p)||p<=0) return;
-    setProds(prev=>[...prev,{id:nid,name:nname.trim(),price:p,thumb:nthumb,variant:nvar.trim(),category:ncat.trim()}]);
-    setNid(n=>n+1); setNname(''); setNprice(''); setNthumb(null); setNvar(''); setNcat('');
+    const st=parseInt(nstock); setProds(prev=>[...prev,{id:nid,name:nname.trim(),price:p,thumb:nthumb,variant:nvar.trim(),category:ncat.trim(),stock:isNaN(st)?null:st}]);
+    setNid(n=>n+1); setNname(''); setNprice(''); setNthumb(null); setNvar(''); setNcat(''); setNstock('');
   };
   const rmProd = id=>{setProds(p=>p.filter(x=>x.id!==id));setCart(p=>{const c={...p};delete c[id];return c;});};
-  const saveEd = id=>{setProds(p=>p.map(x=>x.id===id?{...x,name:ed.name,price:parseInt(ed.price)||x.price,thumb:ed.thumb,variant:ed.variant,category:ed.category||''}:x));setEd(null);};
+  const saveEd = id=>{const st=parseInt(ed.stock);setProds(p=>p.map(x=>x.id===id?{...x,name:ed.name,price:parseInt(ed.price)||x.price,thumb:ed.thumb,variant:ed.variant,category:ed.category||'',stock:isNaN(st)?null:st}:x));setEd(null);};
 
   const startEdSale = s=>setEdSale({id:s.id,items:s.items.map(i=>({...i,eQty:String(i.qty),ePrice:String(i.price)}))});
   const saveEdSale  = ()=>{
@@ -540,8 +551,11 @@ function App() {
                 {/* catFilterで絞り込み */}
                 {prods.filter(p=>catFilter==='すべて'||(p.category||'')=== catFilter).map(p=>{
                   const q=cart[p.id]||0;
+                  const hasStock = p.stock===null||p.stock===undefined;
+                  const soldOut  = !hasStock && p.stock<=0;
+                  const remain   = hasStock ? null : p.stock - q;
                   return (
-                    <div key={p.id} className={`prod-card${q>0?' sel':''}`}>
+                    <div key={p.id} className={`prod-card${q>0?' sel':''}`} style={{opacity:soldOut?0.45:1}}>
                       {p.thumb?(
                         <div style={{width:'100%',aspectRatio:'3/2',position:'relative',overflow:'hidden',borderRadius:'1rem 1rem 0 0'}}>
                           <img src={p.thumb} alt={p.name} style={{position:'absolute',inset:0,width:'100%',height:'100%',objectFit:'cover',display:'block',transition:'transform 0.38s ease'}}
@@ -557,11 +571,24 @@ function App() {
                       <div style={{padding:'12px 14px'}}>
                         <div style={{fontWeight:500,fontSize:14,color:C.ink,lineHeight:1.3,marginBottom:2}}>{p.name}</div>
                         {p.variant&&<div style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,letterSpacing:'0.06em',marginBottom:4}}>{p.variant}</div>}
-                        <div className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.sage,fontWeight:500,marginBottom:12}}>{yen(p.price)}</div>
+                        <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
+                          <span className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.sage,fontWeight:500}}>{yen(p.price)}</span>
+                          {!hasStock&&(
+                            <span style={{fontFamily:'var(--fm)',fontSize:10,letterSpacing:'0.06em',
+                              color: p.stock<=0?C.danger : remain<=3?'#8C6C30':C.muted,
+                              background: p.stock<=0?C.dangerBg : remain<=3?'#fef8e8':C.bgAlt,
+                              border: `1px solid ${p.stock<=0?C.dangerBorder:remain<=3?'#f4e099':C.border}`,
+                              borderRadius:999, padding:'1px 7px',
+                            }}>
+                              {p.stock<=0?'在庫切れ':`残${p.stock}`}
+                            </span>
+                          )}
+                        </div>
                         <div style={{display:'flex',alignItems:'center',gap:8}}>
                           <button onClick={()=>setQty(p.id,q-1)} style={{background:C.bgAlt,border:`1px solid ${C.border}`,borderRadius:'0.5rem',width:36,height:36,fontSize:18,color:C.muted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center'}}>−</button>
                           <span className="num" style={{fontFamily:'var(--fm)',fontSize:18,minWidth:22,textAlign:'center',color:C.ink,fontWeight:q>0?600:400}}>{q}</span>
-                          <button onClick={()=>setQty(p.id,q+1)} style={{background:q>0?C.sage:C.bgAlt,border:`1px solid ${q>0?C.sage:C.border}`,borderRadius:'0.5rem',width:36,height:36,fontSize:18,color:q>0?'#fff':C.muted,cursor:'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.15s,border-color 0.15s'}}>＋</button>
+                          <button onClick={()=>!soldOut&&!(remain!==null&&remain<=0)&&setQty(p.id,q+1)}
+                            style={{background:q>0&&!soldOut?C.sage:C.bgAlt,border:`1px solid ${q>0&&!soldOut?C.sage:C.border}`,borderRadius:'0.5rem',width:36,height:36,fontSize:18,color:q>0&&!soldOut?'#fff':C.muted,cursor:soldOut||(remain!==null&&remain<=0)?'not-allowed':'pointer',display:'flex',alignItems:'center',justifyContent:'center',transition:'background 0.15s,border-color 0.15s'}}>＋</button>
                         </div>
                       </div>
                     </div>
@@ -673,7 +700,10 @@ function App() {
                         <input value={ed.name} onChange={e=>setEd(v=>({...v,name:e.target.value}))} placeholder="商品名" className="inp" style={p_inp}/>
                         <input value={ed.variant||''} onChange={e=>setEd(v=>({...v,variant:e.target.value}))} placeholder="バリアント名（例：春の野原、夕暮れ）" className="inp" style={{...p_inp,fontSize:13}}/>
                         <input value={ed.category||''} onChange={e=>setEd(v=>({...v,category:e.target.value}))} placeholder="カテゴリー（例：ポストカード、セット、グッズ）" className="inp" style={{...p_inp,fontSize:13}}/>
-                        <input type="number" value={ed.price} onChange={e=>setEd(v=>({...v,price:e.target.value}))} placeholder="価格" className="inp" style={{...p_inp,width:140,textAlign:'right'}}/>
+                        <div style={{display:'flex',gap:8}}>
+                          <input type="number" value={ed.price} onChange={e=>setEd(v=>({...v,price:e.target.value}))} placeholder="価格" className="inp" style={{...p_inp,flex:1,textAlign:'right'}}/>
+                          <input type="number" value={ed.stock===null||ed.stock===undefined?'':String(ed.stock)} onChange={e=>setEd(v=>({...v,stock:e.target.value===''?null:e.target.value}))} placeholder="在庫数（空欄=無制限）" className="inp" style={{...p_inp,flex:1,textAlign:'right'}}/>
+                        </div>
                       </div>
                     </div>
                     <div style={{display:'flex',gap:8,justifyContent:'flex-end'}}>
@@ -692,10 +722,23 @@ function App() {
                         {p.category&&<span style={{fontFamily:'var(--fm)',fontSize:9,letterSpacing:'0.1em',background:C.sageBg,color:C.sage,border:`1px solid ${C.sageBorder}`,borderRadius:999,padding:'1px 8px'}}>{p.category}</span>}
                         {p.variant&&<span style={{fontFamily:'var(--fm)',fontSize:10,color:C.muted,letterSpacing:'0.06em'}}>{p.variant}</span>}
                       </div>
-                      <div className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.sage,fontWeight:500,marginTop:3}}>{yen(p.price)}</div>
+                      <div style={{display:'flex',alignItems:'center',gap:8,marginTop:3}}>
+                        <span className="num" style={{fontFamily:'var(--fm)',fontSize:15,color:C.sage,fontWeight:500}}>{yen(p.price)}</span>
+                        {p.stock!==null&&p.stock!==undefined?(
+                          <span style={{fontFamily:'var(--fm)',fontSize:10,letterSpacing:'0.06em',
+                            color:p.stock<=0?C.danger:p.stock<=3?'#8C6C30':C.muted,
+                            background:p.stock<=0?C.dangerBg:p.stock<=3?'#fef8e8':C.bgAlt,
+                            border:`1px solid ${p.stock<=0?C.dangerBorder:p.stock<=3?'#f4e099':C.border}`,
+                            borderRadius:999,padding:'1px 8px'}}>
+                            {p.stock<=0?'在庫切れ':`在庫 ${p.stock}`}
+                          </span>
+                        ):(
+                          <span style={{fontFamily:'var(--fm)',fontSize:10,color:C.border,letterSpacing:'0.04em'}}>在庫無制限</span>
+                        )}
+                      </div>
                     </div>
                     <div style={{display:'flex',gap:8,flexShrink:0}}>
-                      <button onClick={()=>setEd({id:p.id,name:p.name,price:String(p.price),thumb:p.thumb||null,variant:p.variant||'',category:p.category||''})} className="gb">編集</button>
+                      <button onClick={()=>setEd({id:p.id,name:p.name,price:String(p.price),thumb:p.thumb||null,variant:p.variant||'',category:p.category||'',stock:p.stock===null||p.stock===undefined?null:p.stock})} className="gb">編集</button>
                       <button onClick={()=>rmProd(p.id)} className="gb" style={{color:C.danger,borderColor:`${C.danger}55`}}>削除</button>
                     </div>
                   </div>
@@ -711,7 +754,8 @@ function App() {
               </div>
               <div style={{padding:'1rem 1.5rem 0',display:'flex',gap:10,flexWrap:'wrap'}}>
                 <input value={nname} onChange={e=>setNname(e.target.value)} placeholder="商品名" className="inp" style={{...p_inp,flex:1,minWidth:160}}/>
-                <input type="number" value={nprice} onChange={e=>setNprice(e.target.value)} placeholder="価格" className="inp" style={{...p_inp,width:130,textAlign:'right'}}/>
+                <input type="number" value={nprice} onChange={e=>setNprice(e.target.value)} placeholder="価格" className="inp" style={{...p_inp,width:100,textAlign:'right'}}/>
+                <input type="number" value={nstock} onChange={e=>setNstock(e.target.value)} placeholder="在庫（空=無制限）" className="inp" style={{...p_inp,width:130,textAlign:'right'}}/>
               </div>
               <div style={{padding:'0.625rem 1.5rem 0'}}>
                 <input value={nvar} onChange={e=>setNvar(e.target.value)} placeholder="バリアント名（例：春の野原・ツバメ）— 同一価格で絵柄違いの場合" className="inp" style={{...p_inp,fontSize:13}}/>
